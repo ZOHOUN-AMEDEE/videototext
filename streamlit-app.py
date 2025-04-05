@@ -7,6 +7,10 @@ import whisper
 import pandas as pd
 from fpdf import FPDF
 import base64
+import moviepy.config as moviepy_config
+
+# Spécifier le chemin vers ffmpeg si nécessaire
+# moviepy_config.change_settings({"FFMPEG_BINARY": "/chemin/complet/vers/ffmpeg"})
 
 # Configuration de la page
 st.set_page_config(
@@ -54,11 +58,15 @@ def get_download_link(text, filename, format_type):
         # Format PDF
         pdf = FPDF()
         pdf.add_page()
-        pdf.set_font("Arial", size=12)
         
-        # Encodage correct pour les caractères spéciaux français
-        pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
-        pdf.set_font('DejaVu', '', 12)
+        # Essayer d'utiliser DejaVu pour les caractères spéciaux français
+        try:
+            pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
+            pdf.set_font('DejaVu', '', 12)
+        except RuntimeError:
+            # Si DejaVu n'est pas disponible, utiliser Arial avec encodage latin
+            st.warning("Police DejaVu non trouvée. Utilisation d'Arial avec support limité des accents.")
+            pdf.set_font("Arial", size=12)
         
         # Séparation du texte en lignes pour éviter les dépassements de page
         text_lines = text.split('\n')
@@ -66,10 +74,18 @@ def get_download_link(text, filename, format_type):
             # Traiter les longues lignes
             while len(line) > 0:
                 if len(line) > 75:  # Nombre approximatif de caractères par ligne
-                    pdf.multi_cell(0, 10, line[:75])
+                    # Essayer d'encoder en utf8 si possible
+                    try:
+                        pdf.multi_cell(0, 10, line[:75])
+                    except:
+                        # Fallback pour les caractères spéciaux
+                        pdf.multi_cell(0, 10, line[:75].encode('latin-1', 'replace').decode('latin-1'))
                     line = line[75:]
                 else:
-                    pdf.multi_cell(0, 10, line)
+                    try:
+                        pdf.multi_cell(0, 10, line)
+                    except:
+                        pdf.multi_cell(0, 10, line.encode('latin-1', 'replace').decode('latin-1'))
                     line = ""
         
         pdf_output = pdf.output(dest="S").encode("latin1", errors="replace")
@@ -78,7 +94,29 @@ def get_download_link(text, filename, format_type):
     
     return href
 
+def check_ffmpeg():
+    """Vérifier si ffmpeg est installé et accessible"""
+    import subprocess
+    try:
+        subprocess.run(['ffmpeg', '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        return True
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return False
+
 def main():
+    # Vérification de ffmpeg
+    if not check_ffmpeg():
+        st.error("""
+        ⚠️ ERREUR: ffmpeg n'a pas été trouvé sur votre système. 
+        
+        Pour résoudre ce problème:
+        1. Installez ffmpeg sur votre système
+        2. OU spécifiez le chemin dans le code (décommentez et modifiez la ligne 'moviepy_config.change_settings')
+        
+        Pour plus d'informations sur l'installation de ffmpeg, consultez: https://ffmpeg.org/download.html
+        """)
+        st.stop()
+    
     # Sélection de la langue
     language_options = {
         "Français": "fr",
