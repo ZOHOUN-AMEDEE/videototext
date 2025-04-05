@@ -64,8 +64,6 @@ def get_download_link(text, filename, format_type):
             pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
             pdf.set_font('DejaVu', '', 12)
         except RuntimeError:
-            # Si DejaVu n'est pas disponible, utiliser Arial avec encodage latin
-            st.warning("Police DejaVu non trouvée. Utilisation d'Arial avec support limité des accents.")
             pdf.set_font("Arial", size=12)
         
         # Séparation du texte en lignes pour éviter les dépassements de page
